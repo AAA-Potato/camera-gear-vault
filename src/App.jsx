@@ -458,6 +458,7 @@ export default function CameraGearVault() {
   const [showWarrantyOnly, setShowWarrantyOnly] = useState(false);
   const [sortBy, setSortBy] = useState("date-desc");
   const [toast, setToast] = useState(null);
+  const [parsing, setParsing] = useState(false);
 
   // Sync state — visible in header so user knows if cloud is reachable
   // 'syncing' | 'synced' | 'offline' | 'error' | 'unconfigured'
@@ -500,21 +501,59 @@ export default function CameraGearVault() {
   }, [toast]);
 
   // ────── Smart input flow ──────
-  const handleSmartSubmit = (e) => {
+  const handleSmartSubmit = async (e) => {
     e?.preventDefault?.();
-    if (!smartInput.trim()) return;
-    const parsed = parseInput(smartInput);
-    setPendingItem({
-      id: crypto.randomUUID(),
-      name: parsed.name,
-      price: parsed.price,
-      purchaseDate: parsed.purchaseDate,
-      retailer: parsed.retailer,
-      sourceUrl: parsed.sourceUrl,
-      notes: "",
-      customImages: [],
-    });
-    setSmartInput("");
+    if (!smartInput.trim() || parsing) return;
+
+    const isUrl = /^https?:\/\//i.test(smartInput.trim());
+
+    if (isUrl) {
+      setParsing(true);
+      try {
+        const res = await fetch(`/api/scrape?url=${encodeURIComponent(smartInput.trim())}`);
+        const data = await res.json();
+        setPendingItem({
+          id: crypto.randomUUID(),
+          name: "",
+          price: data.price || "",
+          purchaseDate: new Date().toISOString().slice(0, 10),
+          retailer: data.retailer || "",
+          sourceUrl: data.sourceUrl || smartInput.trim(),
+          notes: "",
+          customImages: data.image ? [] : [],
+          imageUrl: data.image || undefined,
+        });
+      } catch {
+        // Fall back to plain text parsing if API fails
+        const parsed = parseInput(smartInput);
+        setPendingItem({
+          id: crypto.randomUUID(),
+          name: parsed.name,
+          price: parsed.price,
+          purchaseDate: parsed.purchaseDate,
+          retailer: parsed.retailer,
+          sourceUrl: smartInput.trim(),
+          notes: "",
+          customImages: [],
+        });
+      } finally {
+        setParsing(false);
+        setSmartInput("");
+      }
+    } else {
+      const parsed = parseInput(smartInput);
+      setPendingItem({
+        id: crypto.randomUUID(),
+        name: parsed.name,
+        price: parsed.price,
+        purchaseDate: parsed.purchaseDate,
+        retailer: parsed.retailer,
+        sourceUrl: parsed.sourceUrl,
+        notes: "",
+        customImages: [],
+      });
+      setSmartInput("");
+    }
   };
 
   // Add or update an item — writes to local state immediately (optimistic),
@@ -740,6 +779,9 @@ export default function CameraGearVault() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
         }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
 
       <div className="grain" />
@@ -812,15 +854,23 @@ export default function CameraGearVault() {
 
             <button
               type="submit"
-              disabled={!smartInput.trim()}
-              className="px-5 py-3 rounded-sm font-mono-meta text-xs uppercase tracking-[0.2em] border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-900/20"
+              disabled={!smartInput.trim() || parsing}
+              className="px-5 py-3 rounded-sm font-mono-meta text-xs uppercase tracking-[0.2em] border transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-900/20 flex items-center gap-2"
               style={{
                 color: "#d99c50",
                 borderColor: "rgba(217, 156, 80, 0.4)",
                 background: "rgba(217, 156, 80, 0.05)",
               }}
             >
-              Add Item
+              {parsing ? (
+                <>
+                  <span
+                    className="w-3 h-3 rounded-full border-2 border-t-transparent inline-block"
+                    style={{ borderColor: "#d99c50", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }}
+                  />
+                  Fetching…
+                </>
+              ) : "Add Item"}
             </button>
 
             <button
