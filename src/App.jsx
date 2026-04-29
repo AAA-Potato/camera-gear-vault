@@ -524,14 +524,12 @@ export default function CameraGearVault() {
           imageUrl: data.image || undefined,
         });
       } catch {
-        // Fall back to plain text parsing if API fails
-        const parsed = parseInput(smartInput);
         setPendingItem({
           id: crypto.randomUUID(),
-          name: parsed.name,
-          price: parsed.price,
-          purchaseDate: parsed.purchaseDate,
-          retailer: parsed.retailer,
+          name: "",
+          price: "",
+          purchaseDate: new Date().toISOString().slice(0, 10),
+          retailer: "",
           sourceUrl: smartInput.trim(),
           notes: "",
           customImages: [],
