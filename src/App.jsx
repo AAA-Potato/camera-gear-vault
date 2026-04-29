@@ -9,7 +9,6 @@ import {
   Upload,
   Trash2,
   Edit3,
-  ShieldCheck,
   X,
   Sparkles,
   Link2,
@@ -270,21 +269,6 @@ const buildImageUrl = (name) => {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// Warranty math
-// ────────────────────────────────────────────────────────────────────────────
-const daysSince = (dateStr) => {
-  if (!dateStr) return Infinity;
-  const ms = Date.now() - new Date(dateStr).getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-};
-
-const warrantyStatus = (dateStr) => {
-  const d = daysSince(dateStr);
-  if (d <= 365) return { active: true, daysLeft: 365 - d };
-  return { active: false, daysLeft: 0 };
-};
-
-// ────────────────────────────────────────────────────────────────────────────
 // CSV export
 // ────────────────────────────────────────────────────────────────────────────
 const exportCSV = (items) => {
@@ -431,7 +415,8 @@ const fmtUSD = (n, opts = {}) => {
 const fmtDate = (s) => {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleDateString("en-US", {
+    const [y, m, d] = s.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -455,7 +440,6 @@ export default function CameraGearVault() {
   const [editingItem, setEditingItem] = useState(null); // edit existing
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [filter, setFilter] = useState("");
-  const [showWarrantyOnly, setShowWarrantyOnly] = useState(false);
   const [sortBy, setSortBy] = useState("date-desc");
   const [toast, setToast] = useState(null);
   const [parsing, setParsing] = useState(false);
@@ -710,10 +694,6 @@ export default function CameraGearVault() {
           it.notes?.toLowerCase().includes(q)
       );
     }
-    if (showWarrantyOnly) {
-      list = list.filter((it) => warrantyStatus(it.purchaseDate).active);
-    }
-
     // Sort
     const dateVal = (it) => (it.purchaseDate ? new Date(it.purchaseDate).getTime() : 0);
     const priceVal = (it) => Number(it.price) || 0;
@@ -731,8 +711,7 @@ export default function CameraGearVault() {
 
   const totals = useMemo(() => {
     const sum = items.reduce((s, it) => s + (Number(it.price) || 0), 0);
-    const inWarranty = items.filter((it) => warrantyStatus(it.purchaseDate).active).length;
-    return { sum, count: items.length, inWarranty };
+    return { sum, count: items.length };
   }, [items]);
 
   return (
@@ -824,9 +803,8 @@ export default function CameraGearVault() {
 
             {/* Stats */}
             <div className="flex items-center gap-8 font-mono-meta">
-              <Stat label="Investment" value={fmtUSD(totals.sum, { compact: true })} accent />
+              <Stat label="Investment" value={fmtUSD(totals.sum)} accent />
               <Stat label="Items" value={totals.count} />
-              <Stat label="In Warranty" value={totals.inWarranty} amber />
             </div>
           </div>
 
@@ -913,18 +891,6 @@ export default function CameraGearVault() {
               <option value="name-asc">Name: A → Z</option>
               <option value="added-desc">Recently Added</option>
             </select>
-
-            <button
-              onClick={() => setShowWarrantyOnly((v) => !v)}
-              className="px-3 py-2 rounded-sm font-mono-meta text-[10px] uppercase tracking-[0.2em] border transition-all flex items-center gap-2"
-              style={{
-                color: showWarrantyOnly ? "#0d0b0a" : "#d99c50",
-                background: showWarrantyOnly ? "#d99c50" : "transparent",
-                borderColor: "rgba(217, 156, 80, 0.4)",
-              }}
-            >
-              <ShieldCheck size={12} strokeWidth={1.5} /> Warranty
-            </button>
 
             <button
               onClick={() => importInputRef.current?.click()}
@@ -1119,7 +1085,6 @@ function Stat({ label, value, accent, amber }) {
 // GearCard
 // ────────────────────────────────────────────────────────────────────────────
 function GearCard({ item, index, onEdit, onDelete }) {
-  const warranty = warrantyStatus(item.purchaseDate);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -1146,10 +1111,8 @@ function GearCard({ item, index, onEdit, onDelete }) {
       className="group relative rounded-sm border overflow-hidden transition-all duration-500 hover:translate-y-[-2px] fade-up cursor-pointer"
       style={{
         background: "linear-gradient(180deg, rgba(26, 22, 20, 0.7) 0%, rgba(13, 11, 10, 0.9) 100%)",
-        borderColor: warranty.active ? "rgba(217, 156, 80, 0.35)" : "rgba(168, 150, 132, 0.1)",
-        boxShadow: warranty.active
-          ? "0 0 0 1px rgba(217, 156, 80, 0.15), 0 8px 32px -16px rgba(0,0,0,0.6)"
-          : "0 8px 32px -16px rgba(0,0,0,0.6)",
+        borderColor: "rgba(168, 150, 132, 0.1)",
+        boxShadow: "0 8px 32px -16px rgba(0,0,0,0.6)",
         animationDelay: `${index * 60}ms`,
       }}
     >
@@ -1184,22 +1147,6 @@ function GearCard({ item, index, onEdit, onDelete }) {
               "linear-gradient(180deg, transparent 50%, rgba(13, 11, 10, 0.8) 100%)",
           }}
         />
-
-        {/* Warranty badge */}
-        {warranty.active && (
-          <div
-            className="absolute top-3 right-3 px-2.5 py-1 rounded-sm flex items-center gap-1.5 backdrop-blur-md amber-glow"
-            style={{ background: "rgba(13, 11, 10, 0.7)" }}
-          >
-            <ShieldCheck size={11} style={{ color: "#d99c50" }} strokeWidth={1.5} />
-            <span
-              className="font-mono-meta text-[9px] uppercase tracking-[0.2em]"
-              style={{ color: "#d99c50" }}
-            >
-              {warranty.daysLeft}d left
-            </span>
-          </div>
-        )}
 
         {/* Multi-image badge */}
         {extraImageCount > 0 && (
@@ -1479,7 +1426,7 @@ function ItemFormModal({ title, subtitle, item, onSave, onClose, saveLabel, isQu
                       value={local.price}
                       onChange={update("price")}
                       placeholder="0.00"
-                      className="modal-input pl-9"
+                      className="modal-input pl-12"
                     />
                   </div>
                 </Field>
