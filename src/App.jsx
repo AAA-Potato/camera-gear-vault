@@ -55,6 +55,8 @@ const generateVaultKey = () => {
 };
 
 const getOrCreateVaultKey = () => {
+  // If a fixed vault key is set via env, all devices share the same data
+  if (import.meta.env.VITE_VAULT_KEY) return import.meta.env.VITE_VAULT_KEY;
   try {
     let key = localStorage.getItem(VAULT_KEY_STORAGE);
     if (!key || key.length < 16) {
@@ -63,7 +65,6 @@ const getOrCreateVaultKey = () => {
     }
     return key;
   } catch {
-    // localStorage unavailable — generate ephemeral key, won't persist
     return generateVaultKey();
   }
 };
