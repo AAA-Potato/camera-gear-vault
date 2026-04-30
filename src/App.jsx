@@ -707,7 +707,7 @@ export default function CameraGearVault() {
     };
     list.sort(sorters[sortBy] || sorters["date-desc"]);
     return list;
-  }, [items, filter, showWarrantyOnly, sortBy]);
+  }, [items, filter, sortBy]);
 
   const totals = useMemo(() => {
     const sum = items.reduce((s, it) => s + (Number(it.price) || 0), 0);
